@@ -1,9 +1,9 @@
 import React, {useEffect, useState} from 'react';
-import { View, StyleSheet, Dimensions, PixelRatio } from 'react-native';
+import { View, StyleSheet, Dimensions, PixelRatio, TouchableWithoutFeedback } from 'react-native';
 
 const { width, height } = Dimensions.get('window');
-const gridWidth = 8;
-const gridHeight = 16;
+const gridWidth = 12;
+const gridHeight = 24;
 const cellSize = Math.min(width / (gridWidth+1.1), height / (gridHeight+1.1));
 
 const styles = StyleSheet.create({
@@ -24,6 +24,7 @@ const styles = StyleSheet.create({
     height: PixelRatio.roundToNearestPixel(cellSize),
     position: 'absolute',
     backgroundColor: 'green',
+    margin: 2,
   },
 });
 
@@ -42,6 +43,10 @@ const SnakeApp = () => {
     [3, 7],
   ]);
   const [direction, setDirection] = useState(1);
+  const [snakeSpeed, setSnakeSpeed] = useState(100);
+  const [touchIn, setTouchIn] = useState(false);
+  const [touchLoc, setTouchLoc] = useState([0, 0]);
+  const [reachedTouch, setReachedTouch] = useState(false);
 
   const renderSnake = (snakeCoordinates) => {
     const snakeViews : any[] = [];
@@ -71,8 +76,8 @@ const SnakeApp = () => {
       snakeViews.push(<View key = {i} style={[styles.cell, {
         left: PixelRatio.roundToNearestPixel((currentSegment[0] + x) * cellSize), 
         top: PixelRatio.roundToNearestPixel((currentSegment[1] + y) * cellSize), 
-        width: PixelRatio.roundToNearestPixel(cellSize*w), 
-        height: PixelRatio.roundToNearestPixel(cellSize*h)}
+        width: PixelRatio.roundToNearestPixel(cellSize*w) + 1, 
+        height: PixelRatio.roundToNearestPixel(cellSize*h) + 1}
       ]} />);
 
 
@@ -84,16 +89,19 @@ const SnakeApp = () => {
   const moveSnake = () => {
     const newSnake : any[][] = [];
     
-    let x = snakeCoordinates[0][0], y = snakeCoordinates[0][1];
+    let d = controlSnake();
 
-    if (direction === 0) {
+    let x = snakeCoordinates[0][0];
+    let y = snakeCoordinates[0][1];
+
+    if (d === 0) {
       if (x++ >= gridWidth - 1) x = 0;
-    } else if (direction === 1) {
+    } else if (d === 1) {
       if (y++ >= gridHeight - 1) y = 0;
-    } else if (direction === 2) {
-      if (x-- < 0) x = gridWidth-1;
-    } else if (direction === 3) {
-      if (y-- < 0) y = gridHeight-1;
+    } else if (d === 2) {
+      if (x-- <= 0) x = gridWidth-1;
+    } else if (d === 3) {
+      if (y-- <= 0) y = gridHeight-1;
     }
 
     newSnake.push([x,y]);
@@ -103,23 +111,101 @@ const SnakeApp = () => {
 
     setSnakeCoordinates(newSnake);
   }
-
-
   useEffect(() => {
-    // Set up an interval to move the snake every second
     const intervalId = setInterval(() => {
       moveSnake();
-    }, 1000);
+    }, snakeSpeed);
 
     // Clean up the interval when the component is unmounted
     return () => clearInterval(intervalId);
   }, [snakeCoordinates]);
 
+
+  const controlSnake = () => {
+
+    const headLocation = snakeCoordinates[0];
+    
+    if (Math.floor(touchLoc[0]) === headLocation[0] && Math.floor(touchLoc[1]) === headLocation[1]) {
+      setReachedTouch(true);
+      return direction;
+    }
+    
+    if (!touchIn || reachedTouch) return direction;
+    
+
+    const xDif = 0.5 + headLocation[0] - touchLoc[0];
+    const yDif = 0.5 + headLocation[1] - touchLoc[1];
+
+
+    if (Math.abs(xDif) > Math.abs(yDif)) {
+      if (xDif > 0 && direction === 0 || xDif < 0 && direction === 2) {
+        if (yDif > 0) {
+          setDirection(3);
+          return 3;
+        }else if (yDif < 0) {
+          setDirection(1);
+          return 1;
+        }
+      }
+      else if (direction === 1 || direction === 3) {
+        if (xDif > 0) {
+          setDirection(2);
+          return 2;
+        }else if (xDif < 0) {
+          setDirection(0);
+          return 0;
+        }
+      }
+    }
+    else if (Math.abs(xDif) < Math.abs(yDif)) {
+      if (yDif > 0 && direction === 1 || yDif < 0 && direction === 3) {
+        if (xDif > 0) {
+          setDirection(2);
+          return 2
+        }else if (xDif < 0) {
+          setDirection(0);
+          return 0
+        }
+      }
+      else if (direction === 0 || direction === 2) {
+        if (yDif > 0) {
+          setDirection(3);
+          return 3;
+        }else if (yDif < 0) {
+          setDirection(1);
+          return 1;
+        }
+      }
+    }
+    
+    return direction;
+  };
+
+  const handlePressIn = (event) => {
+    if (touchIn) return;
+    const {locationX, locationY} = event.nativeEvent
+    setTouchLoc([locationX/cellSize, locationY/cellSize]);
+    setTouchIn(true);
+  };
+
+  const handlePressOut = () => {
+    setTouchIn(false);
+    setReachedTouch(false);
+  }
+
+  const handlePressMove = (event) => {
+    const {locationX, locationY} = event.nativeEvent
+    setTouchLoc([locationX/cellSize, locationY/cellSize]);
+  }
+  
+
   return (
     <View style={styles.container}>
-      <View style={styles.field}>
+      <TouchableWithoutFeedback>
+        <View style={styles.field}  onTouchStart={handlePressIn} onTouchEnd={handlePressOut} onTouchMove={handlePressMove}>
         {renderSnake(snakeCoordinates)}
-      </View>
+        </View>
+      </TouchableWithoutFeedback>
     </View>
   );
 };
