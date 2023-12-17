@@ -41,12 +41,19 @@ const SnakeApp = () => {
     [3, 5],
     [3, 6],
     [3, 7],
+    [3, 7],
+    [3, 7],
+    [3, 7],
+    [3, 7],
+    [3, 7],
   ]);
   const [direction, setDirection] = useState(1);
-  const [snakeSpeed, setSnakeSpeed] = useState(100);
+  const [snakeSpeed, setSnakeSpeed] = useState(200);
   const [touchIn, setTouchIn] = useState(false);
   const [touchLoc, setTouchLoc] = useState([0, 0]);
+  const [initTouch, setInitTouch] = useState([0,0]);
   const [reachedTouch, setReachedTouch] = useState(false);
+
 
   const renderSnake = (snakeCoordinates) => {
     const snakeViews : any[] = [];
@@ -86,6 +93,28 @@ const SnakeApp = () => {
     return snakeViews;
   }
 
+
+  //const renderSnake
+
+  const checkCollision = () => {
+    let head = snakeCoordinates[0];
+
+    for (let i = 1; i < snakeCoordinates.length; i++) {
+      if (head[0] === snakeCoordinates[i][0] && head[1] === snakeCoordinates[i][1]) return true;
+    }
+    
+    return false;
+  }
+
+  const snakeContains = (square) => {
+    for (let i = 0; i < snakeCoordinates.length; i++) {
+      if (square[0] === snakeCoordinates[i][0] && square[1] === snakeCoordinates[i][1]) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   const moveSnake = () => {
     const newSnake : any[][] = [];
     
@@ -109,6 +138,7 @@ const SnakeApp = () => {
       newSnake.push(snakeCoordinates[i]);
     }
 
+    setDirection(d);
     setSnakeCoordinates(newSnake);
   }
   useEffect(() => {
@@ -124,8 +154,10 @@ const SnakeApp = () => {
   const controlSnake = () => {
 
     const headLocation = snakeCoordinates[0];
+    const x = headLocation[0];
+    const y = headLocation[1];
     
-    if (Math.floor(touchLoc[0]) === headLocation[0] && Math.floor(touchLoc[1]) === headLocation[1]) {
+    if (Math.floor(touchLoc[0]) === x && Math.floor(touchLoc[1]) === y) {
       setReachedTouch(true);
       return direction;
     }
@@ -133,51 +165,63 @@ const SnakeApp = () => {
     if (!touchIn || reachedTouch) return direction;
     
 
-    const xDif = 0.5 + headLocation[0] - touchLoc[0];
-    const yDif = 0.5 + headLocation[1] - touchLoc[1];
-
+    const xDif = 0.5 + x - touchLoc[0];
+    const yDif = 0.5 + y - touchLoc[1];
 
     if (Math.abs(xDif) > Math.abs(yDif)) {
+      // Check if the touch is behind the snake, if it is, do a u-turn
       if (xDif > 0 && direction === 0 || xDif < 0 && direction === 2) {
         if (yDif > 0) {
-          setDirection(3);
-          return 3;
+          return snakeContains([x, y - 1]) ? direction : 3;
         }else if (yDif < 0) {
-          setDirection(1);
+          return snakeContains([x, y + 1]) ? direction : 1;
+        }
+      }
+      // Otherwise, figure out which way to go
+      else if (direction === 1 || direction === 3) {
+        if (xDif > 0) {
+          return snakeContains([x - 1, y]) ? direction : 2;
+        }else if (xDif < 0) {
+          return snakeContains([x + 1, y]) ? direction : 0;
+        }
+      }
+      // Try avoid running into self
+      else {
+        let upOrDown = direction === 0 ? 1 : (-1);
+        if (yDif > 0 && snakeContains([x+upOrDown, y]) && !snakeContains([x,y-1])) {
+          return 3;
+        } else if (yDif < 0 && snakeContains([x+upOrDown, y]) && !snakeContains([x,y+1])) {
           return 1;
         }
       }
-      else if (direction === 1 || direction === 3) {
-        if (xDif > 0) {
-          setDirection(2);
-          return 2;
-        }else if (xDif < 0) {
-          setDirection(0);
-          return 0;
-        }
-      }
     }
+    // Same but in y direction
     else if (Math.abs(xDif) < Math.abs(yDif)) {
       if (yDif > 0 && direction === 1 || yDif < 0 && direction === 3) {
         if (xDif > 0) {
-          setDirection(2);
-          return 2
+          return snakeContains([x - 1, y]) ? direction : 2;
         }else if (xDif < 0) {
-          setDirection(0);
-          return 0
+          return snakeContains([x + 1, y]) ? direction : 0;
         }
       }
       else if (direction === 0 || direction === 2) {
         if (yDif > 0) {
-          setDirection(3);
-          return 3;
+          return snakeContains([x, y - 1]) ? direction : 3;
         }else if (yDif < 0) {
-          setDirection(1);
-          return 1;
+          return snakeContains([x, y + 1]) ? direction : 1;
+        }
+      }
+      else {
+        let upOrDown = direction === 1 ? 1 : (-1);
+        if (xDif > 0 && snakeContains([x, y+upOrDown]) && !snakeContains([x-1,y])) {
+          return 2;
+        } else if (yDif < 0 && snakeContains([x, y+upOrDown]) && !snakeContains([x+1,y])) {
+          return 0;
         }
       }
     }
     
+
     return direction;
   };
 
@@ -185,7 +229,9 @@ const SnakeApp = () => {
     if (touchIn) return;
     const {locationX, locationY} = event.nativeEvent
     setTouchLoc([locationX/cellSize, locationY/cellSize]);
+    setInitTouch([locationX/cellSize, locationY/cellSize]);
     setTouchIn(true);
+    setReachedTouch(false);
   };
 
   const handlePressOut = () => {
@@ -196,6 +242,11 @@ const SnakeApp = () => {
   const handlePressMove = (event) => {
     const {locationX, locationY} = event.nativeEvent
     setTouchLoc([locationX/cellSize, locationY/cellSize]);
+
+    if ((locationX/cellSize - initTouch[0])**2 + (locationY/cellSize - initTouch[1])**2 > 2) {
+      setInitTouch([locationX/cellSize, locationY/cellSize]);
+      setReachedTouch(false);
+    }
   }
   
 
